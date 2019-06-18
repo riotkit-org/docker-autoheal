@@ -1,11 +1,16 @@
 ARG arch=x86_64
-FROM multiarch/alpine:${arch}-v3.8
+FROM multiarch/alpine:${arch}-v3.9
 
-RUN apk add --no-cache curl jq
-
+COPY ./ /opt/repairman
 COPY docker-entrypoint /
-ENTRYPOINT ["/docker-entrypoint"]
 
-HEALTHCHECK --interval=5s CMD exit 0
+RUN apk add --no-cache curl jq python3 bash \
+    && cd /opt/repairman \
+    && pip install -i ./requirements.txt \
+    && python3 setup.py install \
+    && rm -rf /opt/repairman
 
-CMD ["autoheal"]
+ENTRYPOINT ["/entrypoint.sh"]
+HEALTHCHECK --interval=5s CMD curl -k -s -f http://localhost || exit 1
+
+CMD ["repairman"]
