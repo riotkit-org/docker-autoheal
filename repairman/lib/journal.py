@@ -24,9 +24,9 @@ class Journal:
         self._migrate()
 
     def find_restart_count_in_frame(self, container: Container):
-        q = self._exec(
+        result = self._fetch_all(
             '''
-                SELECT COUNT(container_name)
+                SELECT *
                 FROM journal 
                 WHERE 
                     event_type = ?
@@ -37,13 +37,13 @@ class Journal:
                 self._EVENT_TYPE_RESTART,
                 '-' + str(container.policy.frame_size_in_seconds) + ' seconds',
                 container.get_name()
-             ]
+            ]
         )
 
-        return q.fetchone()[0]
+        return len(result)
 
     def find_last_restart_time(self, container: Container) -> int:
-        q = self._exec(
+        result = self._fetch_one(
             '''
                 SELECT strftime("%s", event_date)
                 FROM journal
@@ -56,25 +56,27 @@ class Journal:
             [self._EVENT_TYPE_RESTART, container.get_name()]
         )
 
-        result = q.fetchone()
-
         if not result:
             return 0
 
         return int(result[0])
 
     def _migrate(self):
-        self._exec(
-            '''
-                CREATE TABLE journal (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    container_name TEXT, 
-                    event_type TEXT, 
-                    event_date TEXT, 
-                    message TEXT
-                    );
-            '''
-        )
+        try:
+            self._exec(
+                '''
+                    CREATE TABLE journal (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        container_name TEXT, 
+                        event_type TEXT, 
+                        event_date TEXT, 
+                        message TEXT
+                        );
+                '''
+            )
+        except sqlite3.OperationalError:
+            # the table can already exist in case, when the database file is persistable
+            pass
 
     def _rotate_events(self, container: Container):
         self._exec(
@@ -108,6 +110,9 @@ class Journal:
         for container in containers:
             restart_count_in_frame = self.find_restart_count_in_frame(container)
 
+            if container.policy.max_restarts_in_frame == 0:
+                continue
+
             if restart_count_in_frame > container.policy.max_restarts_in_frame:
                 failing.append({
                     'id': container.get_name(),
@@ -118,7 +123,7 @@ class Journal:
         return failing
 
     def _find_last_events(self):
-        q = self._exec(
+        events = self._fetch_all(
             '''
                 SELECT 
                     message, 
@@ -137,7 +142,7 @@ class Journal:
                 'container': row[1],
                 'num': row[3]
             },
-            q.fetchall()
+            events
         ))
 
     def record_restart(self, container: Container):
@@ -157,13 +162,33 @@ class Journal:
             ]
         )
 
-    def _exec(self, sql, params=None) -> sqlite3.Cursor:
+    def __query(self, sql: str, params=None) -> sqlite3.Cursor:
         if params is None:
             params = []
 
-        try:
-            self.lock.acquire()
+        return self.cur.execute(sql, params)
 
-            return self.cur.execute(sql, params)
+    def _exec(self, sql: str, params=None) -> None:
+        self.lock.acquire()
+        try:
+            self.__query(sql, params)
         finally:
             self.lock.release()
+
+    def _fetch_one(self, sql: str, params=None):
+        self.lock.acquire()
+
+        try:
+            result = self.__query(sql, params).fetchone()
+        finally:
+            self.lock.release()
+
+        return result
+
+    def _fetch_all(self, sql: str, params=None):
+        self.lock.acquire()
+
+        result = self.__query(sql, params).fetchall()
+        self.lock.release()
+
+        return result

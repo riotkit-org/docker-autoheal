@@ -1,7 +1,11 @@
 
-from .entity import Container, ApplicationGlobalPolicy
 import abc
 import docker
+import time
+import tornado.log
+from .entity import Container, ApplicationGlobalPolicy
+from .exception import ConfigurationException
+from .notify import Notify
 
 
 class Adapter(metaclass=abc.ABCMeta):
@@ -35,10 +39,13 @@ class Adapter(metaclass=abc.ABCMeta):
 class DockerAdapter(Adapter):
     api: docker.DockerClient
     policy: ApplicationGlobalPolicy
+    notify: Notify
+    _invalid_containers = {}
 
     def __init__(self, app_policy: ApplicationGlobalPolicy):
         self.policy = app_policy
         self.api = docker.from_env()
+        self.notify = Notify(app_policy)
 
     def remove_container(self, container_id: str):
         container = self.api.containers.get(container_id)
@@ -47,7 +54,8 @@ class DockerAdapter(Adapter):
 
     def restart_container(self, container_id: str):
         container = self.api.containers.get(container_id)
-        container.restart()
+        #container.restart()
+        time.sleep(40) # @debug
 
     def get_log(self, container_id: str, max_lines: int = 10):
         container = self.api.containers.get(container_id)
@@ -87,8 +95,13 @@ class DockerAdapter(Adapter):
     def _map_containers(self, containers: list):
         """ From internal docker container  """
 
-        return list(map(
-            lambda docker_container: Container(
+        return list(filter(lambda x: x is not None, map(self._map_container, containers)))
+
+    def _map_container(self, docker_container):
+        container = None
+
+        try:
+            container = Container(
                 docker_container.name,
                 docker_container.status,
                 docker_container.attrs['State']['ExitCode'],
@@ -98,9 +111,29 @@ class DockerAdapter(Adapter):
                         labels=docker_container.attrs['Config']['Labels']
                     )
                 )
-            ),
-            containers
-        ))
+            )
+            container.policy.validate()
+
+        except Exception as e:
+            # do not repeat the same notification twice or more too often
+            if str(docker_container.name) in self._invalid_containers \
+                    and self._invalid_containers[str(docker_container.name)] > time.time():
+                return None
+
+            self._invalid_containers[str(docker_container.name)] = time.time() + 600
+
+            tornado.log.app_log.error(str(docker_container.name) + ': ' + str(e))
+            tornado.log.app_log.error(str(docker_container.name) + ': Cannot monitor container due to ' +
+                                      'configuration error. Please check container labels')
+
+            if container:
+                self.notify.container_configuration_invalid(container, str(e))
+            else:
+                self.notify.any_container_configuration_invalid(str(e))
+
+            return None
+
+        return container
 
     def _filter_by_prefix(self, containers: list):
         return list(filter(

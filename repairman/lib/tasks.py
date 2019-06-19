@@ -5,6 +5,7 @@ from .entity import Container
 from .exception import ContainerIsLocked
 from .semaphore import LockingManager
 from .notify import Notify
+from .entity import ApplicationGlobalPolicy
 import threading
 import tornado.log
 import time
@@ -21,11 +22,11 @@ class Task(metaclass=abc.ABCMeta):
     _journal: Journal
     _threads = []
 
-    def __init__(self, adapter: Adapter, journal: Journal):
+    def __init__(self, adapter: Adapter, journal: Journal, app_policy: ApplicationGlobalPolicy):
         self._adapter = adapter
         self._journal = journal
         self._lock_manager = LockingManager()
-        self._notify = Notify()
+        self._notify = Notify(app_policy)
 
     @abc.abstractmethod
     def process(self):
@@ -118,18 +119,19 @@ class HealTask(Task):
         if isinstance(policy, int):
             tornado.log.app_log.warn('Waiting for container "' + container.get_name() + '" before next restart')
             self._notify.multiple_failures_happened(container, self._adapter.get_log(container.get_name()))
-            time.sleep(policy)
+            self._sleep(policy)
 
         if policy == self._POLICY_LONGER_WAIT:
             tornado.log.app_log.error('Maximum restarts reached for "' + container.get_name() + '". ' +
                                       'Waiting a bit longer (' + str(container.policy.seconds_between_next_frame) + 's)')
             self._notify.max_restarts_reached(container, self._adapter.get_log(container.get_name()))
-            time.sleep(container.policy.seconds_between_next_frame)
+            self._sleep(container.policy.seconds_between_next_frame)
 
         tornado.log.app_log.info('Sending restart signal for "' + container.get_name() + '"')
         self._journal.record_restart(container)
         self._adapter.restart_container(container.get_name())
         self._notify.container_was_restarted(container, self._adapter.get_log(container.get_name()))
+        tornado.log.app_log.debug('Container "' + container.get_name() + '" was restarted')
 
     def _find_out_what_to_do_with_container(self, container: Container):
         """ Policy method, decides if we can restart the container NOW or if we wait a little bit """
@@ -137,7 +139,10 @@ class HealTask(Task):
         restart_count = self._journal.find_restart_count_in_frame(container)
         last_restart_time = self._journal.find_last_restart_time(container)
 
-        if restart_count > container.policy.max_restarts_in_frame:
+        tornado.log.app_log.debug('Container "' + container.get_name() + '" has restart_count=' + str(restart_count) +
+                                  ' and last_restart_time=' + str(last_restart_time))
+
+        if restart_count > container.policy.max_restarts_in_frame > 0:
             return self._POLICY_LONGER_WAIT
 
         if last_restart_time + container.policy.seconds_between_restarts > time.time():
@@ -145,3 +150,6 @@ class HealTask(Task):
 
         return self._POLICY_RESTART
 
+    def _sleep(self, seconds: int):
+        time.sleep(seconds)
+        tornado.log.app_log.debug('Sleeping ' + str(seconds) + ' seconds')

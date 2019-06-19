@@ -4,6 +4,7 @@ import time
 import logging
 import sys
 import traceback
+import json
 
 from .adapter import Adapter, DockerAdapter
 from .journal import Journal
@@ -34,8 +35,8 @@ class Repairman:
         self._journal = Journal(self._policy)
         self._adapter = DockerAdapter(self._policy)
         self._tasks = [
-            DeduplicationTask(adapter=self._adapter, journal=self._journal),
-            HealTask(adapter=self._adapter, journal=self._journal)
+            DeduplicationTask(adapter=self._adapter, journal=self._journal, app_policy=self._policy),
+            HealTask(adapter=self._adapter, journal=self._journal, app_policy=self._policy)
         ]
 
     def main(self):
@@ -43,6 +44,7 @@ class Repairman:
         tornado.log.enable_pretty_logging()
         tornado.log.app_log.level = logging.DEBUG if self._policy.debug else logging.INFO
         tornado.log.app_log.info('Docker Repairman is starting...')
+        tornado.log.app_log.info(json.dumps(self._policy.to_dict()))
 
         http_server = HttpServer(address=self._http_address, port=self._http_port, server_path_prefix=self._http_prefix)
         http_server.run(lambda: self._journal.get_summary(self._adapter.find_all_containers))

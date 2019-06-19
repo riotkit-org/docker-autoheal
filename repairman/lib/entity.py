@@ -1,12 +1,11 @@
-
 from .exception import ConfigurationException
 
 
 class Policy:
     """ Defines how to treat the Container. Policy is immutable. """
 
-    _parent_policy = None  # type: ApplicationGlobalPolicy
-    _params = {}
+    _parent_policy: None  # type: ApplicationGlobalPolicy
+    _params: dict
     _types = {
         'seconds_between_restarts': int,
         'max_restarts_in_frame': int,
@@ -20,6 +19,7 @@ class Policy:
     }
 
     def __init__(self, params: dict, parent_policy=None):
+        self._params = {}
         self._parent_policy = parent_policy
         types_available = self._get_types()
 
@@ -28,8 +28,6 @@ class Policy:
                 raise ConfigurationException('"' + key + '" argument is unsupported by the ' + str(self))
 
             self._params[key] = self.cast(value, types_available[key])
-
-        self._validate()
 
     @property
     def seconds_between_restarts(self) -> int:
@@ -83,22 +81,29 @@ class Policy:
 
         return str(value)
 
-    def _validate(self):
-        if not self._parent_policy:
-            return
+    def validate(self):
+        if self._parent_policy:
+            max_history = self._parent_policy.max_historic_entries
 
-        max_history = self._parent_policy.max_historic_entries
+            if self.max_restarts_in_frame > max_history:
+                raise ConfigurationException(
+                    'Please increase max-historic-entries above max-restarts of each service')
 
-        if self.max_restarts_in_frame > max_history:
-            raise ConfigurationException(
-                'Please increase max-historic-entries above max-restarts of each service')
-
-        if self.max_checks_to_give_up > max_history:
-            raise ConfigurationException(
-                'Please increase max-historic-entries above max-checks-to-give-up of each service')
+            if self.max_checks_to_give_up > max_history:
+                raise ConfigurationException(
+                    'Please increase max-historic-entries above max-checks-to-give-up of each service')
 
         if self.max_checks_to_give_up and self.max_checks_to_give_up < self.max_restarts_in_frame:
             raise ConfigurationException('max-checks-to-give-up cannot be lower than max-restarts-in-frame')
+
+        restart_operation_timeout_margin = 10  # in seconds
+        proposed_min_frame_size = self.max_restarts_in_frame * restart_operation_timeout_margin * \
+                                  self.seconds_between_restarts
+
+        if self.frame_size_in_seconds < proposed_min_frame_size:
+            raise ConfigurationException('Min frame size in seconds should be at' +
+                                         ' least "' + str(proposed_min_frame_size) + '". ' +
+                                         'Got "' + str(self.frame_size_in_seconds) + '"')
 
 
 class ApplicationGlobalPolicy(Policy):
@@ -109,6 +114,10 @@ class ApplicationGlobalPolicy(Policy):
         'namespace': str,
         'max_historic_entries': int
     }
+
+    def __init__(self, params: dict):
+        super().__init__(params)
+        self.validate()
 
     @property
     def debug(self) -> bool:
