@@ -1,5 +1,6 @@
+FROM multiarch/alpine:x86_64-v3.9
+
 ARG arch=x86_64
-FROM multiarch/alpine:${arch}-v3.9
 
 ENV CHECK_INTERVAL=60 \
     NAMESPACE= \
