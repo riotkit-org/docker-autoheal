@@ -88,8 +88,10 @@ class DockerAdapter(Adapter):
                 self.api.containers.list())
         )
 
-        return self._map_containers(
-            self._filter_by_prefix(unhealthy)
+        return self._filter_by_enabled(
+            self._map_containers(
+                self._filter_by_prefix(unhealthy)
+            )
         )
 
     def _map_containers(self, containers: list):
@@ -135,9 +137,17 @@ class DockerAdapter(Adapter):
 
         return container
 
-    def _filter_by_prefix(self, containers: list):
+    def _filter_by_prefix(self, containers: list) -> list:
         return list(filter(
             lambda docker_container: docker_container.name.startswith(self.policy.namespace),
+            containers
+        ))
+
+    def _filter_by_enabled(self, containers: list) -> list:
+        """ Filters by enabled, only mapped containers """
+
+        return list(filter(
+            lambda container: container.policy.enable_autoheal,
             containers
         ))
 

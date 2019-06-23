@@ -58,7 +58,11 @@ def main():
                              'keep iwa_ait_app_sk.nbz.priamaakcia_1. ' +
                              '(org.riotkit.repairman.enable_cleaning_duplicated_services)',
                         default=True,
-                        action="store_true")
+                        action='store_true')
+    parser.add_argument('--enable-autoheal',
+                        help='By default enable auto-healing for all services',
+                        default=True,
+                        action='store_true')
 
     # HTTP
     parser.add_argument('--http-address',

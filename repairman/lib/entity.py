@@ -16,7 +16,8 @@ class Policy:
         'max_checks_to_give_up': int,
         'notify_url': str,
         'notify_level': str,
-        'enable_cleaning_duplicated_services': bool
+        'enable_cleaning_duplicated_services': bool,
+        'enable_autoheal': bool
     }
 
     def __init__(self, params: dict, parent_policy=None):
@@ -57,6 +58,10 @@ class Policy:
     @property
     def enable_cleaning_duplicated_services(self) -> bool:
         return self._params['enable_cleaning_duplicated_services']
+
+    @property
+    def enable_autoheal(self):
+        return self._params['enable_autoheal']
 
     @property
     def notify_url(self) -> str:

@@ -12,6 +12,10 @@ if [[ ${ENABLE_CLEANING_DUPLICATED_SERVICES} == "true" ]]; then
     BOOLEAN_ARGS="${BOOLEAN_ARGS} --enable-cleaning-duplicated-services"
 fi
 
+if [[ ${DEFAULT_ENABLE_AUTO_HEAL} == "true" ]]; then
+    BOOLEAN_ARGS="${BOOLEAN_ARGS} --enable-autoheal"
+fi
+
 exec "$@" \
     --interval=${CHECK_INTERVAL} \
     --namespace=${NAMESPACE} \
