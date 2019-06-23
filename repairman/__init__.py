@@ -6,9 +6,18 @@ __version__ = '1.0.0'
 
 import argparse
 import sys
-from lib import Repairman
+import traceback
 
-if __name__ == "__main__":
+try:
+    from lib import Repairman
+    from lib.exception import ConfigurationException
+
+except ImportError:
+    from .lib import Repairman
+    from .lib.exception import ConfigurationException
+
+
+def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--debug', help='Prints debugging messages', default=False, action="store_true")
     parser.add_argument('--interval',
@@ -22,15 +31,15 @@ if __name__ == "__main__":
     parser.add_argument('--seconds-between-restarts',
                         help='Time to wait between restarts to give a next try ' +
                              '(org.riotkit.repairman.seconds_between_restarts)',
-                        default=20)
+                        default=15)
     parser.add_argument('--frame-size-in-seconds',
                         help='Amount of time for a frame for each service separately ' +
                              '(org.riotkit.repairman.frame_size_in_seconds)',
-                        default=300)
+                        default=450)
     parser.add_argument('--max-restarts-in-frame',
                         help='Maximum count of restarts per frame to mark container as requiring attention ' +
                              '(org.riotkit.repairman.max_restarts_in_frame)',
-                        default=5)
+                        default=3)
     parser.add_argument('--seconds-between-next-frame',
                         help='Seconds to wait to perform a repair again after reaching maximum retries ' +
                              '(org.riotkit.repairman.seconds_between_next_frame)',
@@ -71,12 +80,25 @@ if __name__ == "__main__":
                         help='Notification level: DEBUG, INFO, ERROR (org.riotkit.repairman.notify_level)',
                         default='INFO')
 
+    parser.add_argument('--db-path',
+                        help='Can allow to persist database into file, defaults to ":memory:" which ' +
+                             'will not keep changes between restarts',
+                        default=':memory:')
+
     parser.description = 'RiotKit\'s Docker Repair Man'
     parsed = parser.parse_args()
 
     try:
         Repairman(params=vars(parsed)).main()
+
+    except ConfigurationException as e:
+        traceback.print_exc(file=sys.stdout)
+
     except KeyboardInterrupt:
         print('[CTRL]+[C]')
         sys.exit(0)
+
+
+if __name__ == "__main__":
+    main()
 

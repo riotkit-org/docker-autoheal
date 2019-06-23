@@ -6,9 +6,9 @@ from .exception import ContainerIsLocked
 from .semaphore import LockingManager
 from .notify import Notify
 from .entity import ApplicationGlobalPolicy
+from .time import Time as time
 import threading
 import tornado.log
-import time
 import abc
 import traceback
 import sys
@@ -116,16 +116,18 @@ class HealTask(Task):
             tornado.log.app_log.info('Will not restart "' + container.get_name() + '"')
             return
 
-        if isinstance(policy, int):
-            tornado.log.app_log.warn('Waiting for container "' + container.get_name() + '" before next restart')
+        if isinstance(policy, int) or isinstance(policy, float):
+            tornado.log.app_log.warn('Waiting ' + str(policy) + 's for container "' + container.get_name() + '" ' +
+                                     'before next restart')
             self._notify.multiple_failures_happened(container, self._adapter.get_log(container.get_name()))
-            self._sleep(policy)
+            time.sleep(policy)
 
         if policy == self._POLICY_LONGER_WAIT:
             tornado.log.app_log.error('Maximum restarts reached for "' + container.get_name() + '". ' +
                                       'Waiting a bit longer (' + str(container.policy.seconds_between_next_frame) + 's)')
             self._notify.max_restarts_reached(container, self._adapter.get_log(container.get_name()))
-            self._sleep(container.policy.seconds_between_next_frame)
+            time.sleep(container.policy.seconds_between_next_frame)
+            self._journal.record_max_restarts_reached_and_waited(container)
 
         tornado.log.app_log.info('Sending restart signal for "' + container.get_name() + '"')
         self._journal.record_restart(container)
@@ -139,17 +141,18 @@ class HealTask(Task):
         restart_count = self._journal.find_restart_count_in_frame(container)
         last_restart_time = self._journal.find_last_restart_time(container)
 
+        if last_restart_time > time.time():
+            tornado.log.app_log.error('A container is marked that last restart time was in the FUTURE! ' +
+                                      'Please check your timezone settings, if everything looks fine ' +
+                                      'then report a BUG in Repairman')
+
         tornado.log.app_log.debug('Container "' + container.get_name() + '" has restart_count=' + str(restart_count) +
                                   ' and last_restart_time=' + str(last_restart_time))
 
-        if restart_count > container.policy.max_restarts_in_frame > 0:
+        if restart_count >= container.policy.max_restarts_in_frame > 0:
             return self._POLICY_LONGER_WAIT
 
         if last_restart_time + container.policy.seconds_between_restarts > time.time():
             return (last_restart_time + container.policy.seconds_between_restarts) - time.time()
 
         return self._POLICY_RESTART
-
-    def _sleep(self, seconds: int):
-        time.sleep(seconds)
-        tornado.log.app_log.debug('Sleeping ' + str(seconds) + ' seconds')

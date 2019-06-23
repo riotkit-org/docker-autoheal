@@ -1,0 +1,92 @@
+CHANGES
+=======
+
+* Fixed individual service configuration
+* Initial refactor into Python, will now focus mostly on documentation and unit tests
+* fix: add in gitignore
+
+v0.7.0
+------
+
+* Add global and per container stop timeouts ; minor doc fixes
+* Exit if right most command fails in pipe
+* Update docker-entrypoint
+
+v0.6.0
+------
+
+
+v0.5.1
+------
+
+* Added AUTOHEAL\_START\_PERIOD to delay the first health check
+* Update README.md
+* Removed tmp\_dir (not needed anymore)
+* Changed system to only one docker-api request, api-request now only gets unhealthy containers
+* feat: add licence
+* Add example for how to create the container
+
+v0.5.0
+------
+
+* Use a specific version of alpine to get a reproducible build and set default arch to x86\_64
+* Added gitlab-ci.yml to be able to build the containers in gitlab
+* Added multiarch build, because I need this image for mi Raspberry PI
+
+v0.4.0
+------
+
+* Fix grammer error
+* Delete container from restart list when container name is null
+
+v0.3.4
+------
+
+* Update docker-entrypoint
+* add curl timeout
+
+v0.3.3
+------
+
+* show container name in log (not us docker binary this time)
+
+v0.3.2
+------
+
+* Revert "Adds container name in log"
+
+v0.3.1
+------
+
+* Adds container name in log
+
+v0.3.0
+------
+
+* Listen for sigterm and exit
+
+v0.2.1
+------
+
+* Only make tmp dir if it doesn't exist #6
+* Fixed typo in README.md
+
+v0.2.0
+------
+
+* Added DOCKER\_SOCK env variable here
+* Made DOCKER\_SOCK configurable,
+
+v0.1.1
+------
+
+* fix variable name
+* try to restart forever
+
+v0.1.0
+------
+
+* add date to autoheal logs
+* docs update
+* force healthcheck to healthy
+* init commit

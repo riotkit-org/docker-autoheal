@@ -1,3 +1,4 @@
 requests>=2<3
 docker>=3.7<5
 tornado>=5<6
+pbr

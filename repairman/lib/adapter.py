@@ -4,7 +4,6 @@ import docker
 import time
 import tornado.log
 from .entity import Container, ApplicationGlobalPolicy
-from .exception import ConfigurationException
 from .notify import Notify
 
 
@@ -54,8 +53,9 @@ class DockerAdapter(Adapter):
 
     def restart_container(self, container_id: str):
         container = self.api.containers.get(container_id)
-        #container.restart()
-        time.sleep(40) # @debug
+        t = time.time()
+        container.restart()
+        tornado.log.app_log.info('Container was restarted in ' + str(time.time() - t) + 's')
 
     def get_log(self, container_id: str, max_lines: int = 10):
         container = self.api.containers.get(container_id)

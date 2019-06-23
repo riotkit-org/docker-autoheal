@@ -1,15 +1,18 @@
 
+
 from .entity import Container
 from .entity import ApplicationGlobalPolicy
 import sqlite3
 import threading
 import typing
+import tornado.log
 
 
 class Journal:
     """ Stores information about containers """
 
     _EVENT_TYPE_RESTART = 'restart'
+    _EVENT_TYPE_MAX_RESTARTS = 'restart.max-reached'
 
     db: sqlite3.Connection
     cur: sqlite3.Cursor
@@ -17,7 +20,7 @@ class Journal:
     lock: threading.Lock
 
     def __init__(self, policy: ApplicationGlobalPolicy):
-        self.db = sqlite3.connect(':memory:', check_same_thread=False)
+        self.db = sqlite3.connect(policy.db_path, check_same_thread=False)
         self.app_policy = policy
         self.cur = self.db.cursor()
         self.lock = threading.Lock()
@@ -26,19 +29,24 @@ class Journal:
     def find_restart_count_in_frame(self, container: Container):
         result = self._fetch_all(
             '''
-                SELECT *
+                SELECT datetime(event_date, 'localtime'), datetime(datetime("now", ?), 'localtime'), container_name
                 FROM journal 
                 WHERE 
                     event_type = ?
-                    AND datetime(event_date) >= datetime("now", ?)
+                    AND datetime(event_date, 'localtime') >= datetime(datetime("now", ?), 'localtime')
                     AND container_name = ?
+                    AND archived is null
             ''',
             [
+                '-' + str(container.policy.frame_size_in_seconds) + ' seconds',
                 self._EVENT_TYPE_RESTART,
                 '-' + str(container.policy.frame_size_in_seconds) + ' seconds',
                 container.get_name()
             ]
         )
+
+        tornado.log.app_log.debug('find_restart_count_in_frame(' + container.get_name() + ')')
+        tornado.log.app_log.debug(str(result))
 
         return len(result)
 
@@ -70,8 +78,9 @@ class Journal:
                         container_name TEXT, 
                         event_type TEXT, 
                         event_date TEXT, 
-                        message TEXT
-                        );
+                        message TEXT,
+                        archived BOOLEAN
+                    );
                 '''
             )
         except sqlite3.OperationalError:
@@ -145,6 +154,19 @@ class Journal:
             events
         ))
 
+    def _mark_all_restarts_as_archived(self, container: Container):
+        self._exec(
+            '''
+                UPDATE journal SET archived = 1 WHERE container_name = ?
+            ''',
+            [container.get_name()]
+        )
+
+    def record_max_restarts_reached_and_waited(self, container: Container):
+        self._record_event(container, self._EVENT_TYPE_MAX_RESTARTS,
+                           'Starting next frame after max restarts reached and wait time')
+        self._mark_all_restarts_as_archived(container)
+
     def record_restart(self, container: Container):
         self._record_event(container, self._EVENT_TYPE_RESTART, 'Container was restarted')
 
@@ -166,7 +188,10 @@ class Journal:
         if params is None:
             params = []
 
-        return self.cur.execute(sql, params)
+        exec_sql = self.cur.execute(sql, params)
+        self.db.commit()
+
+        return exec_sql
 
     def _exec(self, sql: str, params=None) -> None:
         self.lock.acquire()

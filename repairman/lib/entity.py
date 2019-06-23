@@ -1,3 +1,4 @@
+
 from .exception import ConfigurationException
 
 
@@ -96,7 +97,7 @@ class Policy:
         if self.max_checks_to_give_up and self.max_checks_to_give_up < self.max_restarts_in_frame:
             raise ConfigurationException('max-checks-to-give-up cannot be lower than max-restarts-in-frame')
 
-        restart_operation_timeout_margin = 10  # in seconds
+        restart_operation_timeout_margin = 8  # in seconds
         proposed_min_frame_size = self.max_restarts_in_frame * restart_operation_timeout_margin * \
                                   self.seconds_between_restarts
 
@@ -112,7 +113,8 @@ class ApplicationGlobalPolicy(Policy):
     _global_policy_types = {
         'debug': bool,
         'namespace': str,
-        'max_historic_entries': int
+        'max_historic_entries': int,
+        'db_path': str
     }
 
     def __init__(self, params: dict):
@@ -134,6 +136,10 @@ class ApplicationGlobalPolicy(Policy):
     @property
     def clean_up_duplicated_services_after_update(self) -> bool:
         return self._params['enable_cleaning_duplicated_services']
+
+    @property
+    def db_path(self) -> str:
+        return self._params['db_path']
 
     def create_service_policy(self, modified_params: dict) -> Policy:
         """ Create a regular Policy object for container mixing default values from ApplicationGlobalPolicy
