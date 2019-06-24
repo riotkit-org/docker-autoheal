@@ -60,7 +60,8 @@ def main():
                         default=True,
                         action='store_true')
     parser.add_argument('--enable-autoheal',
-                        help='By default enable auto-healing for all services',
+                        help='By default enable auto-healing for all services ' +
+                             '(org.riotkit.repairman.enable_autoheal)',
                         default=True,
                         action='store_true')
 
