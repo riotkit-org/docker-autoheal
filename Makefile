@@ -28,7 +28,7 @@ all: build build_arm install unit_test run
 
 ## Build docker image
 build_image:
-	sudo docker build . -t wolnosciowiec/repairman
+	sudo docker build . -f .infrastructure/Dockerfile -t wolnosciowiec/repairman
 
 ## Build
 build_package:

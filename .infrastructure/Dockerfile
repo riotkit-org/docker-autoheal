@@ -28,7 +28,7 @@ RUN apk add --no-cache curl python3 bash git make tzdata \
     && rm -rf /opt/repairman \
     && rm -rf /var/cache/apk/*
 
-COPY entrypoint.sh /
+COPY .infrastructure/entrypoint.sh /
 ENTRYPOINT ["bash", "/entrypoint.sh"]
 HEALTHCHECK --interval=2m CMD curl -k -s -f http://localhost || exit 1
 
