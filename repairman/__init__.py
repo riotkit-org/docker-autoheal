@@ -50,7 +50,7 @@ def main():
                              '(org.riotkit.repairman.max_checks_to_give_up)',
                         default=10)
     parser.add_argument('--max-historic-entries',
-                        help='Maximum historic entries per container',
+                        help='Maximum historic entries per container (org.riotkit.repairman.max_historic_entries)',
                         default=20)
     parser.add_argument('--enable-cleaning-duplicated-services',
                         help='Clear duplicated services after auto-update with watchtower' +
