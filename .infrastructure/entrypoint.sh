@@ -30,5 +30,5 @@ exec "$@" \
     --http-prefix=${HTTP_PREFIX} \
     --notify-url=${DEFAULT_NOTIFY_URL} \
     --notify-level=${DEFAULT_NOTIFY_LEVEL} \
+    --db-path=${DB_PATH} \
     ${BOOLEAN_ARGS}
-    # --docker-socket=${DOCKER_SOCK:-/var/run/docker.sock}

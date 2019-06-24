@@ -17,7 +17,8 @@ ENV CHECK_INTERVAL=60 \
     HTTP_PORT=80 \
     HTTP_PREFIX= \
     DEFAULT_NOTIFY_URL= \
-    DEFAULT_NOTIFY_LEVEL=info
+    DEFAULT_NOTIFY_LEVEL=info \
+    DB_PATH=:memory:
 
 COPY ./ /opt/repairman
 
