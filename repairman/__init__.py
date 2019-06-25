@@ -57,12 +57,12 @@ def main():
                              ', eg. delete 6e61b61ead5c_iwa_ait_app_sk.nbz.priamaakcia_1 and ' +
                              'keep iwa_ait_app_sk.nbz.priamaakcia_1. ' +
                              '(org.riotkit.repairman.enable_cleaning_duplicated_services)',
-                        default=True,
+                        default=False,
                         action='store_true')
     parser.add_argument('--enable-autoheal',
                         help='By default enable auto-healing for all services ' +
                              '(org.riotkit.repairman.enable_autoheal)',
-                        default=True,
+                        default=False,
                         action='store_true')
 
     # HTTP
