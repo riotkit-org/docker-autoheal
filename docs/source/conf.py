@@ -2,8 +2,8 @@ project = 'Repairman'
 copyright = '2019, RiotKit Team'
 author = 'Wesolowski'
 
-version = ''
-release = '2'
+version = '1'
+release = '1'
 
 extensions = [
     'sphinx.ext.todo',
