@@ -23,7 +23,7 @@ Using docker-compose we can define a clean, easy to read YAML file:
                 DEFAULT_MAX_CHECKS_TO_GIVE_UP: 50
                 DEFAULT_MAX_HISTORIC_ENTRIES: 50
                 DEFAULT_ENABLE_DUPLICATED_SERVICES_REMOVING: "true"
-                DEFAULT_ENABLE_AUTO_HEAL: "false"
+                DEFAULT_ENABLE_AUTO_HEAL: "true"
                 TZ: Europe/Warsaw
                 DEFAULT_NOTIFY_LEVEL: debug
                 DEFAULT_NOTIFY_URL: ""
@@ -33,6 +33,7 @@ Using docker-compose we can define a clean, easy to read YAML file:
                 - /var/run/docker.sock:/var/run/docker.sock
             labels:
                 com.centurylinklabs.watchtower.enable: true
+                org.riotkit.repairman.enable_autoheal: false
 
 
 .. code:: bash
