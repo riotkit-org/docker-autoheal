@@ -104,10 +104,10 @@ class DockerAdapter(Adapter):
 
         try:
             container = Container(
-                docker_container.name,
-                docker_container.status,
-                docker_container.attrs['State']['ExitCode'],
-                docker_container.attrs['Created'],
+                str(docker_container.name),
+                str(docker_container.status).lower(),
+                int(docker_container.attrs['State']['ExitCode']),
+                str(docker_container.attrs['Created']),
                 self.policy.create_service_policy(
                     self.create_policy_params_from_docker_container_tags(
                         labels=docker_container.attrs['Config']['Labels']

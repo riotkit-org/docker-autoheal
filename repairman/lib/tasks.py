@@ -33,6 +33,19 @@ class Task(metaclass=abc.ABCMeta):
         pass
 
 
+class MonitorRepairedTask(Task):
+    def process(self):
+        all_in_network = self._adapter.find_all_containers_in_namespace()
+
+        for container in all_in_network:
+            if not container.is_healthy():
+                continue
+
+            if self._journal.find_is_marked_as_not_touch(container):
+                self._journal.clear_all_container_history(container)
+                self._notify.container_is_back_to_alive(container)
+
+
 class DeduplicationTask(Task):
     def process(self):
         all_in_network = self._adapter.find_all_containers_in_namespace()
@@ -113,7 +126,10 @@ class HealTask(Task):
         policy = self._find_out_what_to_do_with_container(container)
 
         if policy == self._POLICY_DO_NOT_TOUCH:
-            tornado.log.app_log.info('Will not restart "' + container.get_name() + '"')
+            if self._journal.record_do_not_touch(container):
+                self._notify.not_touching_anymore(container)
+
+            tornado.log.app_log.info('Will not be touching "' + container.get_name() + '" anymore')
             return
 
         if isinstance(policy, int) or isinstance(policy, float):
@@ -137,6 +153,11 @@ class HealTask(Task):
 
     def _find_out_what_to_do_with_container(self, container: Container):
         """ Policy method, decides if we can restart the container NOW or if we wait a little bit """
+
+        total_restart_count = self._journal.get_total_restart_count_in_all_frames(container)
+
+        if 0 < container.policy.max_checks_to_give_up <= total_restart_count:
+            return self._POLICY_DO_NOT_TOUCH
 
         restart_count = self._journal.find_restart_count_in_frame(container)
         last_restart_time = self._journal.find_last_restart_time(container)

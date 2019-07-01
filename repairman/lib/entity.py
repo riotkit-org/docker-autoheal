@@ -102,7 +102,7 @@ class Policy:
         if self.max_checks_to_give_up and self.max_checks_to_give_up < self.max_restarts_in_frame:
             raise ConfigurationException('max-checks-to-give-up cannot be lower than max-restarts-in-frame')
 
-        restart_operation_timeout_margin = 8  # in seconds
+        restart_operation_timeout_margin = 4  # in seconds
         proposed_min_frame_size = self.max_restarts_in_frame * restart_operation_timeout_margin * \
                                   self.seconds_between_restarts
 
@@ -191,6 +191,9 @@ class Container:
 
     def identify(self) -> str:
         return self.get_name()
+
+    def is_healthy(self):
+        return self._status in ['healthy', 'running']
 
     @property
     def policy(self):

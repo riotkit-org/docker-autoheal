@@ -10,8 +10,16 @@ import asyncio
 class MainHandler(tornado.web.RequestHandler):  # pragma: no cover
     callback: typing.Callable
 
+    def _get_limit(self) -> int:
+        limit = int(self.get_query_argument('limit', '20'))
+
+        if limit < 1 or limit > 1000:
+            limit = 20
+
+        return limit
+
     def get(self):
-        result = MainHandler.callback()
+        result = MainHandler.callback(self._get_limit())
 
         self.set_status(500 if not result['global_status'] else 200)
         self.add_header('Content-Type', 'application/json')

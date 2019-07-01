@@ -13,6 +13,7 @@ class Journal:
 
     _EVENT_TYPE_RESTART = 'restart'
     _EVENT_TYPE_MAX_RESTARTS = 'restart.max-reached'
+    _EVENT_TYPE_DNT = 'do-not-touch-anymore'
 
     db: sqlite3.Connection
     cur: sqlite3.Cursor
@@ -26,29 +27,60 @@ class Journal:
         self.lock = threading.Lock()
         self._migrate()
 
-    def find_restart_count_in_frame(self, container: Container):
+    def _find_events(self, container_name: str, event_type: str, time_modifier_to_start_from: str,
+                     archived: bool = False) -> list:
+
+        archived_str = ''
+
+        if not archived:
+            archived_str = 'AND archived is null'
+
         result = self._fetch_all(
             '''
-                SELECT datetime(event_date, 'localtime'), datetime(datetime("now", ?), 'localtime'), container_name
+                SELECT datetime(event_date, 'localtime'), datetime(datetime("now", ?), 'localtime'), journal.*
                 FROM journal 
                 WHERE 
                     event_type = ?
                     AND datetime(event_date, 'localtime') >= datetime(datetime("now", ?), 'localtime')
                     AND container_name = ?
-                    AND archived is null
+                    ''' + archived_str + '''
             ''',
             [
-                '-' + str(container.policy.frame_size_in_seconds) + ' seconds',
-                self._EVENT_TYPE_RESTART,
-                '-' + str(container.policy.frame_size_in_seconds) + ' seconds',
-                container.get_name()
+                time_modifier_to_start_from,
+                event_type,
+                time_modifier_to_start_from,
+                container_name
             ]
         )
 
-        tornado.log.app_log.debug('find_restart_count_in_frame(' + container.get_name() + ')')
+        tornado.log.app_log.debug('_find_events(' + container_name + ', ' + event_type + ', ' +
+                                  time_modifier_to_start_from + ')')
         tornado.log.app_log.debug(str(result))
 
-        return len(result)
+        return result
+
+    def get_total_restart_count_in_all_frames(self, container: Container) -> int:
+        result = self._fetch_one(
+            '''
+                SELECT COUNT(id)
+                FROM journal
+                WHERE 
+                    container_name = ? AND event_type = ?
+            ''',
+            [
+                container.get_name(), self._EVENT_TYPE_RESTART
+            ]
+        )
+
+        return int(result[0])
+
+    def find_restart_count_in_frame(self, container: Container) -> int:
+        return len(self._find_events(container.get_name(), self._EVENT_TYPE_RESTART,
+                   '-' + str(container.policy.frame_size_in_seconds) + ' seconds'))
+
+    def find_reached_max_restarts_in_previous_frame(self, container: Container) -> bool:
+        return len(self._find_events(container.get_name(), self._EVENT_TYPE_MAX_RESTARTS,
+                   '-' + str(container.policy.frame_size_in_seconds * 2) + ' seconds', archived=True)) > 0
 
     def find_last_restart_time(self, container: Container) -> int:
         result = self._fetch_one(
@@ -103,35 +135,42 @@ class Journal:
             ]
         )
 
-    def get_summary(self, callback: typing.Callable) -> dict:
+    def get_summary(self, callback: typing.Callable, last_events_limit: int) -> dict:
         failing = self._find_failing(callback())
 
         return {
-            'last_events': self._find_last_events(),
-            'find_failing': failing,
-            'failing_count': len(failing),
-            'global_status': len(failing) > 0
+            'last_events': self._find_last_events(last_events_limit),
+            'constantly_failing': failing,
+            'constantly_failing_count': len(failing),
+            'global_status': len(failing) == 0
         }
 
     def _find_failing(self, containers: list) -> list:
         failing = []
 
         for container in containers:
-            restart_count_in_frame = self.find_restart_count_in_frame(container)
-
             if container.policy.max_restarts_in_frame == 0:
                 continue
 
-            if restart_count_in_frame > container.policy.max_restarts_in_frame:
+            restart_count_in_frame = self.find_restart_count_in_frame(container)
+            reached_max_restarts_in_previous_frame = self.find_reached_max_restarts_in_previous_frame(container)
+
+            # first condition: now already reached max restarts in frame
+            # second condition: still failing, whole previous frame failed, in current frame we have at least
+            #  1 check failing
+
+            if restart_count_in_frame > container.policy.max_restarts_in_frame \
+                    or (restart_count_in_frame > 0 and reached_max_restarts_in_previous_frame):
                 failing.append({
                     'id': container.get_name(),
                     'ident': container.get_name() + '=False',
-                    'restarts': restart_count_in_frame
+                    'restarts_in_current_frame': restart_count_in_frame,
+                    'reached_max_in_previous_frame': reached_max_restarts_in_previous_frame
                 })
 
         return failing
 
-    def _find_last_events(self):
+    def _find_last_events(self, limit: int = 20):
         events = self._fetch_all(
             '''
                 SELECT 
@@ -140,8 +179,9 @@ class Journal:
                     event_date as time, 
                     id as num 
                 FROM journal
-                ORDER BY id DESC LIMIT 0, 20
-            '''
+                ORDER BY id DESC LIMIT 0, ?
+            ''',
+            [limit]
         )
 
         return list(map(
@@ -154,7 +194,30 @@ class Journal:
             events
         ))
 
-    def _mark_all_restarts_as_archived(self, container: Container):
+    def find_is_marked_as_not_touch(self, container: Container):
+        events = self._fetch_one(
+            '''
+                SELECT COUNT(id)
+                FROM journal
+                WHERE 
+                    container_name = ? AND event_type = ?
+            ''',
+            [
+                container.get_name(), self._EVENT_TYPE_DNT
+            ]
+        )
+
+        return int(events[0]) > 0
+
+    def clear_all_container_history(self, container: Container):
+        self._exec(
+            '''
+                DELETE FROM journal WHERE container_name = ?
+            ''',
+            [container.get_name()]
+        )
+
+    def _mark_all_events_as_archived(self, container: Container):
         self._exec(
             '''
                 UPDATE journal SET archived = 1 WHERE container_name = ?
@@ -163,9 +226,19 @@ class Journal:
         )
 
     def record_max_restarts_reached_and_waited(self, container: Container):
+        self._mark_all_events_as_archived(container)
         self._record_event(container, self._EVENT_TYPE_MAX_RESTARTS,
                            'Starting next frame after max restarts reached and wait time')
-        self._mark_all_restarts_as_archived(container)
+
+    def record_do_not_touch(self, container: Container) -> bool:
+        """ Returns success when the service was just now marked as "DO NOT TOUCH" """
+
+        # do not spam with events
+        if self.find_is_marked_as_not_touch(container):
+            return False
+
+        self._record_event(container, self._EVENT_TYPE_DNT, 'Maximum restarts reached, not touching anymore')
+        return True
 
     def record_restart(self, container: Container):
         self._record_event(container, self._EVENT_TYPE_RESTART, 'Container was restarted')
@@ -189,6 +262,9 @@ class Journal:
             params = []
 
         exec_sql = self.cur.execute(sql, params)
+
+        # tornado.log.app_log.debug(sql)
+
         self.db.commit()
 
         return exec_sql

@@ -30,11 +30,20 @@ class Notify:
     def container_was_restarted(self, container: Container, log: str):
         self._send(container, '[:warning:] Container was restarted', self._DEBUG, log)
 
+    def container_is_back_to_alive(self, container: Container):
+        self._send(container, '[:sunglasses:] Container is healthy now', self._INFO)
+
     def max_restarts_reached(self, container: Container, log: str):
         self._send(container, '[:exclamation:] Max restarts reached, will wait longer till next try', self._ERROR, log)
 
     def multiple_failures_happened(self, container: Container, log: str):
         self._send(container, '[:exclamation:] Multiple restart failures happened', self._INFO, log)
+
+    def not_touching_anymore(self, container: Container):
+        self._send(container,
+                   '[:exclamation: :exclamation: :exclamation:] Admin, help. I\'m not touching the container ' +
+                   'anymore. Max restarts reached.',
+                   self._INFO)
 
     def container_configuration_invalid(self, container: Container, message: str):
         self._send(container, '[:exclamation:] Container configuration error: ' + message, self._ERROR)

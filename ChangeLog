@@ -1,6 +1,18 @@
 CHANGES
 =======
 
+* Updated compose proposed setup
+* Added first test and set up travis ci
+* Changed readme
+* Changed default values to more reasonable, so the boolean switches will now work
+* Corrected compose config
+* Added --db-path as DB\_PATH to Docker image
+* Added docs
+* Infrastructure files clean up
+* Added missing in-line shell docs for --enable-autoheal
+* Added \`--enable-autoheal\`
+* Fixed build on quay
+* Configurable database path, system timezone support, docker container, pypi build
 * Fixed individual service configuration
 * Initial refactor into Python, will now focus mostly on documentation and unit tests
 * fix: add in gitignore

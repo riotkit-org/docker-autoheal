@@ -22,7 +22,7 @@ def main():
     parser.add_argument('--debug', help='Prints debugging messages', default=False, action="store_true")
     parser.add_argument('--interval',
                         help='How often in seconds check all containers?',
-                        default=120)
+                        default=90)
     parser.add_argument('--namespace',
                         help='Docker containers name prefix',
                         default='')
@@ -35,23 +35,23 @@ def main():
     parser.add_argument('--frame-size-in-seconds',
                         help='Amount of time for a frame for each service separately ' +
                              '(org.riotkit.repairman.frame_size_in_seconds)',
-                        default=450)
+                        default=300)
     parser.add_argument('--max-restarts-in-frame',
                         help='Maximum count of restarts per frame to mark container as requiring attention ' +
                              '(org.riotkit.repairman.max_restarts_in_frame)',
-                        default=3)
+                        default=2)
     parser.add_argument('--seconds-between-next-frame',
                         help='Seconds to wait to perform a repair again after reaching maximum retries ' +
                              '(org.riotkit.repairman.seconds_between_next_frame)',
-                        default=3600)
+                        default=600)
     parser.add_argument('--max-checks-to-give-up',
                         help='Maximum count of checks to give up and ' +
                              'mark the container as not recoverable automatically ' +
                              '(org.riotkit.repairman.max_checks_to_give_up)',
-                        default=10)
+                        default=50)
     parser.add_argument('--max-historic-entries',
                         help='Maximum historic entries per container (org.riotkit.repairman.max_historic_entries)',
-                        default=20)
+                        default=50)
     parser.add_argument('--enable-cleaning-duplicated-services',
                         help='Clear duplicated services after auto-update with watchtower' +
                              ', eg. delete 6e61b61ead5c_iwa_ait_app_sk.nbz.priamaakcia_1 and ' +
